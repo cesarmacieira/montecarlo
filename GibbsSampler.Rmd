@@ -1,0 +1,282 @@
+---
+title: "Two-state Gibbs Sampler"
+subtitle: "(Amostrador de Gibbs dois estágios)"
+author: "César Macieira"
+date: "17 de setembro de 2019"
+output: html_document
+---
+
+# Prefácio {-}
+<p>O amostrador de Gibbs *(Gibbs Sampler)* é um algoritmo para gerar uma sequência de amostras da distribuição conjunta de probabilidades de duas ou mais variáveis aleatórias correlacionadas, tendo como principal objetivo aproximar a distribuição conjunta.<p/>
+
+# Two-state Gibbs Sampler: Definição {-}
+<p>O amostrador de Gibbs de dois estágios *(Two-State Gibbs Sampler)* é um método de MCMC que possui propriedades de convergência superiores ao amostrador de múltiplos níveis, assim como pode ser aplicado naturalmente a uma ampla gama de modelos estatísticos que não exigem a generalização do amostrador de vários estágios.</p>
+
+# Vantagens e desvantagens {-}
+<p>A principal vantagem deste método é que primeiramente a maior parte de sua calibração é a partir da densidade principal (alvo) e permite simplificar problemas complexos em problemas mais fáceis, como por exemplo distribuição composta por vários estágios em uma sequência de pequena dimensão. 
+<p>Uma desvantagem que deve ser levada em consideração é o fato de que uma sequência simples pode levar muito tempo para convergir.</p>
+
+# Funcionamento {-}
+<p>O amostrador Gibbs de dois estágios cria uma cadeia de Markov a partir de uma distribuição conjunta. Supondo duas variáveis aleatórias X e Y que têm densidade conjunta $f(x, y)$ e densidades condicionais correspondentes $f_{Y|X}$ e $f_{X|Y}$. O amostrador Gibbs de dois estágios gera uma cadeia de Markov $(X_t, Y_t)$ seguindo os passos:</p>
+
+1. Faça: $X_0 = x_0$
+2. Para $t = 1, 2, 3...,$ gere:
+  * $Y_t \sim f_{Y|X} (.|x_{t-1})$;
+  * $X_t \sim f_{X|Y} (.|y_t)$;
+
+<p>Desde que seja possível simular a partir as condicionais, a implementação do algoritmo é simples. Se $(X_t, Y_t)$ tem distribuição $f$, então é similar a $(X_{t+1}, Y_{t+1})$, porque ambas as etapas de iteração usam a simulação das condicionais reais. A convergência da cadeia de Markov é assegurada, a menos que os suportes das condicionais não estejam conectados (dependentes), isto é, se não for possível obter as distribuições condicionais completas $f(y_i|Y_i)$.</p>
+
+# Exemplo 1 {-}
+<p>Considere um modelo normal bivariado:</p>
+
+\begin{align}
+(X,Y) \sim N_2 \left(\begin{array}{cc} 
+0, &\left(\begin{array}{cc} 
+1 & \rho\\
+\rho & 1
+\end{array}\right)
+\end{array}\right)
+\end{align}
+
+<p>Dado $X_t$ gere:</p>
+$$
+\begin{align}
+Y_{t+1}|x_t \sim Normal(\rho x_t,1-\rho^2)
+\end{align}
+$$
+$$
+\begin{align}
+X_{t+1}|y_{t+1} \sim Normal(\rho y_{t+1},1-\rho^2)
+\end{align}
+$$
+<p>A subcadeia $(X_t)_t$ satisfaz</p>
+$$
+\begin{align}
+X_{t+1}|X_t = x_t \sim Normal(\rho^2 x_t,1-\rho^4)
+\end{align}
+$$
+<p>E a recursividade mostra que:</p>
+$$
+\begin{align}
+X_{t}|X_0 = x_0 \sim Normal(\rho^{2t} x_0,1-\rho^{4t})
+\end{align}
+$$
+<p>Que converge para $N(0,1)$ a medida que tende ao infinito.</p>
+
+# Exemplo 2 {-}
+<p>Considere as distribuições</p>
+$$
+\begin{align}
+X|\theta \sim Binonimal(n,\theta); \theta \sim Beta(a,b)
+\end{align}
+$$
+<p>E a distribuição conjunta</p>
+$$
+\begin{align}
+f(x,\theta)= \binom {n}{x} \frac{\Gamma(a+b)}{\Gamma(a)\Gamma(b)} \theta^{x+a-1}(1-\theta)^{n-x+b-1}
+\end{align}
+$$
+<p>Isto posto, temos que $\theta|x \sim Beta(x+a,n-x+b)$. O algoritmo pode ser implementado da seguinte forma:</p>
+```{r}
+Nsim=5000 #Número de simulações
+n=15
+a=3
+b=7
+X=theta=array(0,dim=c(Nsim,1)) #Vetores iniciais
+theta[1]=rbeta(1,a,b) #Cadeia inicial
+X[1]=rbinom(1,n,T[1])
+for (i in 2:Nsim){ 
+ X[i]=rbinom(1,n,theta[i-1])
+ theta[i]=rbeta(1,a+X[i],n-X[i]+b)
+}
+```
+
+```{r,include=FALSE}
+require(extraDistr)
+```
+
+
+```{r, fig.align="center",echo=FALSE}
+par(mfrow=c(1,2))
+hist(X,xlab="X",prob=T,ylab="Densidade marginal",
+     main="Valores estimados")
+hist(rbbinom(5000, 15, 3, 7),xlab="X",prob=T,ylab="Densidade marginal",
+     main="Valores reais")
+```
+
+```{r, fig.align="center",echo=FALSE}
+par(mfrow=c(1,2))
+hist(theta,xlab=expression(theta),prob=T,ylab="Densidade marginal",
+     main="Valores estimados")
+hist(rbeta(5000,3,7),xlab=expression(theta),prob=T,ylab="Densidade marginal",
+     main="Valores reais")
+
+```
+<p>As marginais de $X$ e $\theta$ estão mostradas nos histogramas e mostram um bom ajuste. A distribuição marginal real de $\theta$ é $Beta(a=3,b=7)$ e de X é Beta-Binomial.</p>
+
+# Exemplo 3 {-}
+<p>Considere a distribuição à posteriori de $(\theta,\sigma^2)$ associada ao modelo</p>
+$$
+\begin{align}
+X_i \sim Normal(\theta,\sigma^2), i=1,...,n
+\end{align}
+$$
+$$
+\begin{align}
+\theta \sim Normal(\theta_0,\tau^2)
+\end{align}
+$$
+$$
+\begin{align}
+\sigma^2 \sim Gama Inversa (a,b)
+\end{align}
+$$
+<p>A densidade da Gama Inversa é dada por:</p>
+$$
+\begin{align}
+f(\sigma^2)=\frac{b^a}{\Gamma(a)} \left(\frac{1}{x}\right)^{a+1}exp{\left(\frac{-b}{x}\right)}
+\end{align}
+$$
+Sendo $\theta_0,\tau^2,$ $a$ e $b$ conhecidos. Escrevendo $x = (x_1,...,x_n)$, a distribuição a posteriori de $(\theta,\sigma^2)$ é dada por: 
+$$
+\begin{align}
+f(\theta,\sigma^2|x)\propto \left[\frac{1}{(\sigma^2)^\frac{n}{2}}exp\Bigg\{{\sum_{i}\frac{(x_i-\theta)^2}{2\sigma^2}\Bigg\}}\right] \times 
+\left[\frac{1}{\tau}exp\Bigg\{{-\frac{\theta-\theta_0}{2\tau^2}}\Bigg\}\right] \times \\ \times \left[\frac{1}{(\sigma^2)^{a+1}}exp\Bigg\{{\frac{1}{b\sigma^2}}\Bigg\}\right]
+\end{align}
+$$
+<p>Onde é possível obter as condicionais de $\theta$ e $\sigma^2$. Escrevendo $x = (x_1,...,x_n)$, temos:</p>
+$$
+\begin{align}
+\pi(\theta|x,\sigma^2)\propto exp\left(\sum_{i} \frac{(x_i-\theta)^2}{2\sigma^2}\right)exp\left(\frac{-(\theta-\theta_0)^2}{2\tau^2\sigma^2}\right)
+\end{align}
+$$
+$$
+\begin{align}
+\pi(\sigma^2|x,\theta)\propto \left(\frac{1}{\sigma^2}\right)^\frac{(n+2a+3)}{2} exp\Bigg\{\frac{1}{2\sigma^2}\left(\sum_{i}(x_i-\theta)+\frac{(\theta-\theta_0)^2}{\tau^2}+\frac{2}{b}\right)\Bigg\}
+\end{align}
+$$
+<p>As densidade correspondentes são:</p>
+$$
+\begin{align}
+\theta|x,\sigma^2 \sim Normal\left(\frac{\sigma^2\theta_0}{\sigma^2+n\tau^2}+\frac{n\tau^2\overline{x}}{\sigma^2+n\tau^2},\frac{\sigma^2\tau^2}{\sigma^2+n\tau^2}\right)
+\end{align}
+$$
+
+$$
+\begin{align}
+\sigma^2|x,\theta \sim GI\left(\frac{n}{2}+a,\frac{1}{2}\sum_i(x_i-\theta)^2+b\right)
+\end{align}
+$$
+<p>Onde $\overline{x}$ é a média empírica das observações.</p>
+<p>Um estudo sobre o metabolismo em mulheres de 15 anos de idade produziu os seguintes dados correspondentes à ingestão de energia, medida em megajoules, durante um período de 24 horas. Considerando o modelo normal anterior, com $\theta$ sendo a média real de ingestão de energia.</p>
+<p>Sendo $\theta_0, \tau^2,$ $a$ e $b$ conhecidos, $a=b=3, \tau^2=10$ e $\theta_0=5$, pode-se implementar o amostrador de Gibbs da seguinte forma:</p>
+```{r}
+x=c(91,504,557,609,693,727,764,803,857,929,970,1043,1089,1195,1384,1713)
+a=b=3
+tau2=10
+theta0=5
+xbar=mean(x)
+sh1=(n/2)+a
+sigma2=theta=rep(0,Nsim)              
+sigma2[1]=1/rgamma(1,shape=a,rate=b)    
+B=sigma2[1]/(sigma2[1]+n*tau2)
+theta[1]=rnorm(1,m=B*theta0+(1-B)*xbar,sd=sqrt(tau2*B))
+for (i in 2:Nsim){
+   B=sigma2[i-1]/(sigma2[i-1]+n*tau2)
+   theta[i]=rnorm(1,m=B*theta0+(1-B)*xbar,sd=sqrt(tau2*B))
+   ra1=(1/2)*(sum((x-theta[i])^2))+b
+   sigma2[i]=1/rgamma(1,shape=sh1,rate=ra1)
+}
+summary(theta)
+summary(sigma2)
+
+```
+
+```{r,echo=FALSE,fig.align="center"}
+par(mfrow=c(1,2))
+hist(theta,main="Valores estimados (real = 5)", ylab="Frequência", xlab=expression(theta))
+hist(sigma2,main="Número de simulações = 5000", ylab="Frequência", xlab=expression(sigma^2))
+```
+
+# Exemplo 4 {-}
+<p>Suponha que a densidade de probabilidade conjunta de duas variáveis aleatórias (X,Y), ambas contínuas, correlacionadas e com valores no eixo real positivo, seja dada por:</p>
+$$
+\begin{align}
+f(x,y)=kx^4exp\big\{ -x(2+y)\big\}
+\end{align}
+$$
+<p>Queremos simular vetores aleatórios (X, Y ) que sigam esta distribuição conjunta.</p>
+<p>Para fazer isto usando Gibbs Sampler, precisamos das duas distribuições condicionais: $f_{Y|X}(y|x)$ e $f_{X|Y}(x|y)$. Sabemos que</p>
+$$
+\begin{align}
+f_{Y|X}(y|x)=\frac{f_{X,Y}(x,y)}{f_X(x)}\propto f_{X,Y}(x,y)
+\end{align}
+$$
+$$
+\begin{align}
+=kx^4exp\big\{-x(2+y)\big\}
+\end{align}
+$$
+$$
+\begin{align}
+=k \times exp\big\{-xy\big\}
+\end{align}
+$$
+<p>Ignorando os termos que não envolvem y. A expressão anterior vista como função apenas de y, possui o mesmo núcleo de uma densidade exponencial com parâmetro igual a x. Isto é, descobrimos que $(Y|X = x) \sim exp(x)$. Do mesmo modo,</p>
+$$
+\begin{align}
+f_{X|Y}(x|y)\propto f_{X,Y}(x,y)\propto x^{5-1}exp\big\{-x(2+y)\big\}
+\end{align}
+$$
+<p>O que significa que $(X|Y = y) \sim Gamma(5,2+y)$</p>
+<p>O Amostrador de Gibbs para esta densidade f(x, y) pode ser implementado da seguinte forma:</p>
+```{r}
+B = 1000
+x = y = rep(NA, B)
+x[1] = 1
+y[1] = 1
+for(i in 2:B){
+  x[i] = rgamma(1, 5, 2+y[i-1])
+  y[i] = rexp(1, x[i])
+}
+```
+
+```{r,echo=FALSE,fig.align="center"}
+par(mfrow=c(2,2))
+plot(x, type="l",ylim=c(0,10),xlab="Simulação")
+plot(y, type="l",ylim=c(0,10),xlab="Simulação")
+plot(x,y)
+plot(x,y, log="xy")
+```
+
+A convergência é imediata. Usando x = 100 e y = 150 como valor inicial.
+```{r}
+B = 1000
+x = y = rep(NA, B)
+x[1] = 100
+y[1] = 150
+for(i in 2:B){
+  x[i] = rgamma(1, 5, 2+y[i-1])
+  y[i] = rexp(1, x[i])
+}
+```
+
+```{r,fig.align="center",echo=FALSE}
+par(mfrow=c(2,2))
+plot(x, type="l",ylim=c(0,10),xlab="Simulação")
+plot(y, type="l",ylim=c(0,10),xlab="Simulação")
+plot(x,y)
+plot(x,y, log="xy")
+```
+
+#Referências {-}
+* Christian Robert, George Casella (auth.) (2010). Introducing Monte Carlo Methods with R. 1a ed. Use R. Springer-Verlag.
+* Brooks S., et al. (eds.) (2011). Handbook of Markov Chain Monte Carlo. Chapman & Hall/CRC handbooks of modern statistical methods. Taylor & Francis.
+* https://homepages.dcc.ufmg.br/~assuncao/pgm/aulas/aulas2017/IntroGibbsSampler.pdf
+
+
+
+
+
+
+

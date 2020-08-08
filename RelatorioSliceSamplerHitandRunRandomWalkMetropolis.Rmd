@@ -1,0 +1,266 @@
+---
+title: "Slice Sampler, Hit-and-run e Random Walk Metropolis"
+subtitle: "(Amostrador por partes)"
+author: "César Macieira"
+date: "12 de novembro de 2019"
+output: html_document
+---
+```{r,include=F,message=FALSE,warning=FALSE}
+if(!require(hitandrun)){ install.packages("hitandrun"); require(hitandrun) }
+```
+
+# Prefácio {-}
+
+<p>Suponha que você queira amostrar alguma variável aleatória $X$ com a distribuição $f(x)$ em que a altura de $f(x)$ corresponde à probabilidade nesse ponto.</p>
+
+<p>Caso a amostragem seja uniforme $X$, cada valor teria a mesma probabilidade de ser amostrado e sua distribuição teria a forma $f(x) = y$ para algum valor y em vez de alguma função não uniforme $f(x)$. Portanto deve-se usar algum método que considere as probabilidades distintas para cada valor.</p>
+
+# Slice Sampler: Definição {-}
+
+<p>É uma versão geral do amostrador de Gibbs que se aplica a grande parte das distribuições e se fundamenta na simulação de variáveis aleatórias uniformes específicas. O método baseia-se na observação de que, para amostrar uma variável aleatória, pode-se amostrar uniformemente da região sob o gráfico de sua função de densidade.</p>
+
+# Vantagens e desvantagens {-}
+
+<p>Mais fácil de implementar que o Metropolis Hastings, amostragem mais rápida que o método de rejeição e pode ajustar a diversos tipos de distribuição.
+
+<p>Uma desvantagem que deve ser levada em consideração é o fato de que encontrar as raízes da interseção entre a linha horizontal e a distribuição é bastante complicado.</p>
+
+# Funcionamento {-}
+
+<p>Primeiro desenhamos fatias horizontais de altura uniforme em toda a curva. Em seguida, amostra-se um ponto dentro da curva selecionando aleatoriamente uma fatia que cai na ou abaixo da curva na posição x da iteração anterior e escolhendo aleatoriamente uma posição x em algum lugar ao longo da fatia. Usando a posição x da iteração anterior do algoritmo, a longo prazo, selecionamos fatias com probabilidades proporcionais aos comprimentos de seus segmentos na curva.</p>
+
+# Pseudocódigo {-}
+
+1. Escolha um valor inicial $x_0$ para o qual $f(x_0)>0$;
+2. Amostre y dentre $0$ e $f(x_0)$;
+3. Desenhe uma linha horizontal ao longo da curva nesta posição $y$;
+4. Amostre um ponto $(x,y)$ dos segmentos de linha abaixo da curva;
+5. Repita da etapa 2 usando o novo valor $x$.
+
+# Exemplo 1 {-}
+
+<p>Considere $\theta|y \sim Exp(1)$, então $\{\theta:u<p(\theta|y)\}=(0,-log(u))$</p>
+```{r}
+#Código em R
+slice = function(n,thetainicial,densidade,A) {
+  u = theta = rep(NA,n) #Vetor para armazenar
+  theta[1] = thetainicial #Valor inicial
+  u[1] = runif(1,0,densidade(theta[1])) #Amostra inicial
+  for (i in 2:n) { #Calcula os pontos a serem amostrados
+    u[i] = runif(1,0,densidade(theta[i-1]))
+    pontosfinais = A(u[i],theta[i-1])
+    theta[i] = runif(1, pontosfinais[1],pontosfinais[2])
+  }
+  return(list(theta=theta,u=u))
+}
+A = function(u,theta=NA) {
+  c(0,-log(u)) #Função inversa da exponencial
+}
+res = slice(100, 0.1, dexp, A) 
+curve(dexp(x,1),ylab="",lwd=2,col="black",n=1001,main="Slice sampler Exp(1)")
+points(res$theta,res$u,col="red",pch=19,cex=0.6)
+```
+
+# Exemplo 2 {-}
+
+<p>Implemente o método **slice sampler** para a distribuição Normal com média $10$ e desvio padrão $2$.</p>
+<p>O intervalo usado para x é de $0$ a $20$ com precisão de localização da raiz de $0,1$ em cada passo.</p>
+
+```{r}
+# n = número de pontos procurados
+# f = distribuição procurada
+# x.interval is the A,B range of x values possible.
+sliceSample = function (n, f, x.interval = c(0, 1), root.accuracy = 0.01) {
+  pts = vector("numeric", n)  # Vetor para receber os pontos
+  x = runif(1, x.interval[1], x.interval[2]) # Valor inicial de x
+  for (i in 1:n) {
+    pts[i] = x
+    y = runif(1, 0, f(x))    # Seleciona y aleatório
+    detectardif = function (x){ # Detectar diferenças entre valores e a raiz
+      f(x) - y 
+    }
+    roots = c()
+    # De cada raiz, seleciona-se o ponto médio 
+    # Verificando se está abaixo da curva (validando o segmento)
+    for (j in seq(x.interval[1], x.interval[2] - root.accuracy, by = root.accuracy)) {
+      if ((detectardif(j) < 0) != (detectardif(j + root.accuracy) < 0)) {
+        root = uniroot(detectardif, c(j, j + root.accuracy))$root
+        roots = c(roots, root)
+      }
+    }
+    roots = c(x.interval[1], roots, x.interval[2]) #Inclui os pontos extremos ao intervalo
+    segments = matrix(ncol = 2) #Divide as interseções em segmentos de linhas
+    for (j in 1:(length(roots) - 1)) {
+      midpoint = (roots[j + 1] + roots[j]) / 2.0
+      if (f(midpoint) > y) {
+        segments = rbind(segments, c(roots[j], roots[j + 1]))
+      }
+    }
+    # Amostra o próximo x uniformemente dentre os segmentos 
+    total = sum(sapply(2:nrow(segments), function (i) {segments[i, 2] - segments[i, 1]}))
+    # Atribui probabilidades de escolha a cada segmento
+    probs = sapply(2:nrow(segments), function (i) {(segments[i, 2] - segments[i, 1]) / total})
+    p = runif(1, 0, 1)
+    selectSegment = function (x, i) { # Função para selecionar o segmento de linha
+      if (p < x) return(i)
+      else return(selectSegment(x + probs[i + 1], i + 1))
+    }
+    seg = selectSegment(probs[1], 1) # Seleciona o segmento de linha
+    x = runif(1, segments[seg + 1, 1], segments[seg + 1, 2]) # Amostra o novo valor de x
+  }
+  return(pts)
+}
+densidade = function (x) { 
+  dnorm(x, 10, 2) 
+}
+pontos = sliceSample(n = 10000, densidade, x.interval=c(0, 20), root.accuracy = 0.1)
+curve(dnorm(x, 10, 2), from = 0, to = 20, ylab="Densidade", main="Slice Sampling Normal(10, 2)")
+lines(density(pontos), col="red")
+legend(0,0.19,legend = c("Real","Estimado"),col=c("black","red"),lty=1,box.lty=0,cex=0.7)
+```
+
+# Exemplo 3 {-}
+
+<p>Implemente o método **slice sampler** para a distribuição Beta$(0.5,0.5)$.</p>
+
+```{r}
+ConstanteNorm=dbeta(0.5,0.5,0.5)*0.5 #Constante normalizadora
+densidadeinversa=function(d){  #Inversão da função f(x)=y
+  0.5+0.5*sqrt(1-4*(ConstanteNorm/ max(d,dbeta(0.5,0.5,0.5)))^2)*c(-1,1)
+}
+curve(dbeta(x,0.5,0.5),0,1,lwd=2,col="black",n=1001,ylab="Densidade",
+      main="Slice Sampler Beta (0.5,0.5)")
+x=runif(1); #Valor inicial de x
+u=runif(1)*dbeta(x,0.5,0.5);
+for (t in 1:100){ #100 passos
+  bo=densidadeinversa(u)
+  nx=sample(c(runif(1,0,bo[1]),runif(1,bo[2],1)),1)
+  nu=runif(1)*dbeta(nx,0.5,0.5)
+  #lines(c(x,nx),c(u,nu),col="gold",lwd=.5)
+  x=nx
+  u=nu
+  points(x,u,col="red",pch=19,cex=.4)
+}
+```
+
+# Hybrid Slice Sampler
+
+<p>Baseado no processo Hit-and-run, temos o seguinte algoritmo para a transição do estado atual $x$ para o próximo estado $y$:</p>
+
+## Pseudocódigo {-}
+
+1. Amostre $t$ $ \sim Uniforme(0, \rho (x))$ e $\theta \sim (S_{d-1})$ independente;
+2. Amostre $y \sim Uniforme (L_t(x,\theta))$, onde $L_t(x,\theta)= \{x+r\theta \in K(t)$ $|$ $r \in {\rm I\!R^d} \}$ é a linha através de x na direção de $\theta$ com restrição a $K(t)$.
+
+<p>O  núcleo de transição (U) é dado por:</p>
+<p>$U(x,A)= \frac{1}{\rho(x)} \int_0^{\rho(x)} \int_{S_{d-1}} \frac{|L_t(x,\theta) \cap A|}{|L_t(x,\theta)|} d \sigma (\theta) dt$, onde $|.|$ denota a medida de Lebesgue unidimensional.</p>
+
+# Hit-and-run
+
+<p>Consiste em amostrar uma linha unidimensional escolhida aleatoriamente em relação à distribuição condicional correspondente. Seja $S_{d-1}$ um espaço euclidiano unitário de ${\rm I\!R^d}$. Para $x \in K$ e $\theta \in S_{d-1}$ definimos: $L(x,\theta)=\{ x+s\theta \in K|s \in R\}$ como a combinação de x por meio de $\theta$. Uma transição de $x$ para $y$ funciona da seguinte forma: gere um conjunto $L(x,\theta)$ escolhendo $\theta$ com distribuição uniforme no espaço e em seguida escolha $y \in L(x,\theta)$  de acordo com a distribuição determinado por $\rho$ condicionada no acorde $L(x,\theta)$.</p>
+
+## Pseudocódigo {-}
+
+<p>A transição do estado atual $x$ para o próximo estado $y$:</p>
+1. Amostre $\theta \sim Uniforme(S_{d-1})$
+2. Amostre $y \sim H_\theta (x,.)$, onde $H_\theta(x,A)=\frac{\int_{L(x,\theta)}I_A(z)\rho(z)dz}{\int_{L(x,\theta)}\rho(z)dz}$
+
+<p>Para $x \in K$ e $A \subset K$ o núcleo de transição (H) é determinado por:</p>
+
+<p>$H(x,A)=\int S_{d-1} H_\theta (x,A)d \sigma (\theta)$, onde $\sigma=Uniforme(S_{d-1})$ denota a distribuição do espaço.</p>
+
+# Exemplo 4
+
+<p>Considerando um quadrado de lado igual a 1, implemente o método Hit-and-run.</p>
+```{r}
+constr <- mergeConstraints(simplexConstraints(3), exactRatioConstraint(3, 1, 2, 2))
+samples <- hitandrun(constr, n.samples=1000)
+stopifnot(dim(samples) == c(1000, 3))
+stopifnot(all.equal(apply(samples, 1, sum), rep(1, 1000)))
+stopifnot(all.equal(samples[,1]/samples[,2], rep(2, 1000)))
+# Amostra de um retângulo de tamanho 1
+constr <- list(constr = rbind(c(1,0), c(0,1), c(-1,0), c(0,-1)),dir=rep('<=', 4), rhs=c(1, 1, 0, 0))
+state <- har.init(constr)
+result <- har.run(state, n.samples=1000)
+samples <- result$samples
+stopifnot(all(samples >= 0 & samples <= 1))
+result <- har.run(result$state, n.samples=1000)
+samples <- rbind(samples, result$samples)
+plot(samples, xlab="Coordenada X", ylab="Coordenada Y", main="Hit-and-run")
+```
+
+
+# Exemplo 5
+
+<p>Considerando as coordenadas $(-1,0)$, $(0,-1)$ e $(1,1)$, implemente o método Hit-and-run</p>
+```{r}
+A <- rbind(c(-1, 0), c(0, -1), c(1, 1))
+b <- c(0, 0, 1)
+d <- c("<=", "<=", "<=")
+constr <- list(constr=A, rhs=b, dir=d)
+
+# take a point x0 within the polytope
+x0 <- c(0.25, 0.25)
+
+# sample 10,000 points
+samples <- har(x0, constr, 1E4)$samples
+
+# Check dimension of result
+stopifnot(dim(samples) == c(1E4, 2))
+
+# Check that x_i >= 0
+stopifnot(samples >= 0)
+
+# Check that x_1 + x_2 <= 1
+stopifnot(samples[,1] + samples[,2] <= 1)
+plot(samples, xlab="Coordenada X", ylab="Coordenada Y", main="Hit-and-run")
+```
+
+# Random walk Metropolis
+<p>O algoritmo random walk metropolis assume que $q:{\rm I\!R^d}\rightarrow [0,\infty)$ é uma densidade de probabilidade invariável rotacional de ${\rm I\!R^d}$, i.e. $q(r\theta_1)= q(r\theta_2)$ para $\theta_1$,$\theta_2 \in S_{d-1}$. A invariância rotacional garante que q é simétrico. A seguir têm-se a transição do estado atual $x$ para o próximo estado $y$ com proposta $q$</p>
+
+## Pseudocódigo {-}
+
+1. Amoste $z\sim q$ e $u_1,u_2 \sim Uniforme (0,1) independente$.
+2. Se $x+z \in K$, $u_1 \leq \frac{1}{2}$ e $u2<min \{1, \rho(x+z)/ \rho(x) \}$, então deve-se aceitar a proposta, e se $y:=x+z$, então rejeita a proposta e $y:=X$.
+<p>Para simplificar a notação, definimos a probabilidade de aceitar um estado proposto $y=x+z$ como: $\alpha(x,y)=min \big\{1, \frac{\rho(y)}{\rho(x)} \big\}$, para $x$ e $y \in K$ e $\alpha(x,y)=0$ caso contrário.</p>
+<p>Então o núcleo de transição é dado por: $M(x,A)=\frac{1}{2} \int_K I_A(y)\alpha(x,y)q(y-x)dy$, para $A \subset K$ com $x \notin A$ e $M(x,\{x\})=1-M(x,K/ \{x\})$</p>
+
+# Resultados
+
+<p>**Lema 1:** Suponha que para todo $a \in A$ exista os núcleos de transição $P_a^{(1)}$, $P_a^{(2)}$ em $K$ tal que:</p>
+
+1. $P_a^{(1)}$ e $P_a^{(2)}$ são operadores auto-adjuntos em $L_2(\pi_a)$;
+2. $P_a^{(1)}$ é positivo em $L_2(\pi_a)$;
+3. $P_a^{(1)}P_a^{(2)}=P_a^{(2)}$
+
+<p>Então para $P_1$ e $P_2$: $L_2(\pi) \rightarrow L_2(\pi)$ definido por $P_if(x)=\int_A P_a^{(1)}f(x)s(x,a)d\lambda(a)$, $i \in \{1,2\}$, $P_1 \leq P_2$, onde para todo $x \in K$, $(x,$·$)$ é a densidade de acordo com $\lambda$ e para todo $a \in A$, $s($·$,a)$ é integrável com respeito a $\pi$.</p>
+
+<p>**Lema 2:** Seja $t \geq 0$ e $\theta \in S_{d-1}$. Para a integral de Lebesgue $f:K(t) \rightarrow {\rm I\!R^d}$, temos que $\int_{K(t)}f(x)dx=\int_{\prod_\theta(K(t))} \int_{L_t(x,\theta}f(y)dydx$.</p>
+
+<p>**Teorema:** Sejam os operadores: M (Markov de random walk Metropolis com invariância rotacional com proposta q), U (hybrid slice sampler baseado em hit-and-run), H (hit-and-run) e S (simple slice sampler). Então por meio do Lema 1: $M \leq U \leq H$ e $M \leq U \leq S $</p>
+
+# Discussões
+
+<p>Relação entre hit-and-run</p>
+1. Se $\pi$ têm distribuição uniforme em K, então apenas uma iteração dosimple slice sampler é suficiente para amostrar $\pi$ $(d>1)$, enquanto que para o algoritmo hit-and-run não é. Portanto, nessa situação, o algoritmo hit-and-run é pior.
+2. Seja $d=1$. Em seguida, o algoritmo hit-and-run irá amostrar $\pi$ em uma etapa, independente de $\pi$. Portanto, neste caso hit-and-run é melhor que o algoritmo simple slice sampler.
+
+<p>Dificuldade em mensurar o quanto uma cadeia de Markov é melhor que a outra.</p>
+
+<p>Dificuldade para encontrar um número de iterações mínimas para convergência, ou seja, mensurar um  número de etapas necessárias para fazer a distância total da variação ser "pequena".</p>
+
+# Referências {-}
+
+* F. Liang, C. Liu, and R. Carroll, Advanced markov chain monte carlo methods: Learning from past samples, Wiley Series in Computational Statistics, Wiley, 2011.
+
+* Christian Robert, George Casella (auth.) (2010). Introducing Monte Carlo Methods with R. 1a ed. Use R. Springer-Verlag.
+
+* Brooks S., et al. (eds.) (2011). Handbook of Markov Chain Monte Carlo. Chapman & Hall/CRC handbooks of modern statistical methods. Taylor & Francis.
+
+* https://thatnerd2.github.io/technical/slicesampl.html
+
+* https://xianblog.wordpress.com/2011/07/28/11433/
+
+* https://www.r-bloggers.com/a-slice-of-infinity/
+

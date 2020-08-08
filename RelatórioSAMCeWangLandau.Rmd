@@ -1,0 +1,157 @@
+---
+title: "Stochastic Approximation Monte Carlo e Wang-Landau"
+author: "César Macieira"
+date: "27/11/2019"
+output: html_document
+---
+
+```{r, include=FALSE,message=FALSE,warning=FALSE}
+if(!require(mvtnorm)){ install.packages("mvtnorm"); require(mvtnorm) }
+if(!require(PAWL)){ install.packages("PAWL"); require(PAWL) }
+if(!require(SAMCpack)){ install.packages("SAMCpack"); require(SAMCpack) }
+if(!require(ggplot2)){ install.packages("ggplot2"); require(ggplot2) }
+```
+
+### Stochastic Approximation Monte Carlo
+
+<p>Aproximação estocástica Monte Carlo é um dos célebres algoritmos Monte Carlo da cadeia de Markov (MCMC). A função SAMC é um amostrador genérico para distribuições no domínio contínuo sendo necessário uma função $R$ para densidade log negativa de sua escolha, além de alguns parâmetros na estrutura.</p>
+
+
+<p>Sabe-se que é possível amostrar a partir de distribuições multimodais ou intratáveis.</p>
+
+##### Funcionamento: SAMC
+<p>O algoritmo é dado por:</p>
+<p>**Amostrando:** Simule uma amostra $x_{t+1}$ com uma única atualização do Metropolis que admita a distribuição invariante $f_{\theta_t}\propto \sum_{i=1}^m \frac{\psi(x)}{exp(\theta_t^{(i)})} I(x \in E_i)$;
+* Gere y do espaço amostral X de acordo com a distribuição proposta $q(x_t,y)$;
+* Calcule a taxa $r=e^{\theta_t^{(J(x_t))}-\theta_t^{(J(x))}}\frac{\psi(y)q(y,x_t)}{\psi(x_t)q(x_t,y)}$;
+* Aceita a proposta com probabilidade $min(1,r)$. Se for aceito, faça $x_{t+1}=y$, caso contrário $x_{t+1}=x_{t}$.</p>
+
+<p>**Atualização dos pesos:** Para $i=q,...,m$, faça $\theta_{t+\frac{1}{2}}^{(i)}=\theta_t^{(i)}+\gamma_{t+1}(I_{\{x_{t+1 \in E_t}\}}-\pi_i)$. Se $\theta_{t+\frac{1}{2}} \in \Theta$, faça $\theta_{t+1}=\theta_{t+\frac{1}{2}}$, caso contrário $\theta_{t+1}=\theta_{t+\frac{1}{2}} + c^*$, onde $c^*$ é um vetor de constantes.</p>
+
+##### Exemplo: 
+<p>Para a distribuição $H(x)=-\{x_1 sin(20x_2)+x_2sin(20x_1)\}^2 cosh\{sin(10x_1)x_1\}-x_1cos(10x_2)-x_2sin(10x_1)\}^2cosh\{cos(20x_1)x_1\}$ com domínio $(x_1,x_2) \in [-1.1,1.1]^2$,  implemente SAMC.</p>
+```{r}
+## Step 1 : Define negative log-density function as an R function
+func_r = function(x){
+  x1 = x[1]; x2 = x[2];
+  val1 = (-(x1*sin(20*x2)+x2*sin(20*x1))^2)*cosh(sin(10*x1)*x1);
+  val2 = (-(x1*cos(10*x2)-x2*sin(10*x1))^2)*cosh(cos(20*x2)*x2);
+  return(val1+val2);
+}
+
+## Step 2 : Prepare a setting option
+myoption = list()
+myoption$partition = c(-Inf,seq(from=-8,to=0,length.out=41))
+myoption$tau       = 1.0
+myoption$domain    = c(-1.1,1.1)
+myoption$vecpi     = as.vector(rep(1/41,41))
+myoption$niter     = 20000
+myoption$stepsize  = c(0.25, 10)
+
+## Step 3 : Run The Code
+res = SAMC(2,func_r,options=myoption)
+
+## Step 4 : Visualize
+select = seq(from=101,to=myoption$niter,by=100) # 100 burn-in, 1/100 thinning 
+par(mfrow=c(1,2))
+plot(res$samples[select,1], res$samples[select,2],xlab='x',ylab='y',main='Amostras')
+barplot(as.vector(res$frequency/sum(res$frequency)),
+        main="Freq. de visitas por partição energética",
+        names.arg=myoption$partition[-1], xlab="Energia")
+
+```
+
+### Wang-Landau
+
+<p>**Definição:** O algoritmo de Wang-Landau procura desenhar amostras em um conjunto no qual cada configuração com energia $u$ recebe um peso $w_n(u) \propto \frac{1}{g(u)}$, onde $g(u)$ é a densidade espectral.</p>
+
+<p>**Vantagens e desvantagens:**O algoritmo Wang-Landau pode ser considerado uma implementação inovadora do Monte Carlo multicanônico. No Monte Carlo multicanônico, o amostrador tende a ser bloqueado pela borda da área já visitada e leva muito tempo para atravessar uma área devido às características gerais da 'caminhada aleatória'. O algoritmo WL consegue remover esses problemas penalizando oportunamente a mudança e a permanência na energia que foi visitada muitas vezes.</p>
+
+<p>**Funcionamento:** Suponha o espaço amostral finito X e a função energia $H(x)$ recebe valores finitos $\{u_1,...,u_m\}$. Na primeira etapa, começa com o valor inicial $\hat{g}(u_i),...,\hat{g}(u_m)=1$ e a amostra aleatória $x_0$ de X e realiza os seguintes passos:</p>
+
+<p>* Simule uma amostra x com uma única atualização do Metropolis que admita a distribuição invariante $\hat{f}(x) \propto 1/\hat{g}(H(x))$;
+* Seja $\hat{g}(u_i)\leftarrow \hat{g}(u_i) \delta^{I(H(x)=u_i)}$ para i=1,...,m, onde $\delta$ é o fator modificação  maior que 1 e $I(.)$ é a função indicadora.</p>
+
+<p>**Critério de iterações:** O algoritmo iterage até que um histograma plano seja produzido no espaço de energia. Um histograma é geralmente considerado plano se a frequência de amostragem de cada interface do usuário não for inferior a $80\%$ da frequência média de amostragem.</p>
+
+<p>Quando essa condição é satisfeita, as estimativas $\hat{g}(u_i)'s$ e a amostra atual x são passadas para o estágio seguinte como valores iniciais, o fator de modificação é reduzido para um valor menor de acordo com um esquema especificado, como por exemplo, $\delta \leftarrow \sqrt{\delta}$ e o coletor de amostras é retomado. A próxima etapa da simulação é iniciada, continuando até que o novo histograma esteja nivelado novamente.</p>
+
+##### Exemplo
+Considerando a distribuição $f(x)=(1/7,2/7,4/7)$ da variável X com os 3 espaços de estados e a matriz de transição: 
+$$\begin{bmatrix}
+0&\frac{1}{2}&\frac{1}{2}\\
+\frac{1}{2}&0&\frac{1}{2}\\
+\frac{1}{2}&\frac{1}{2}&0\\
+\end{bmatrix}
+$$
+<p>Utilize o algoritmo de Wang-Landau para amostrar da variável X.</p>
+
+```{r}
+MatrizTransiçãoA <- matrix(c(0,0.5,0.5,0.5,0,0.5,0.5,0.5,0), nrow = 3, ncol = 3)
+DistribuiçãoAlvo <- c(1/7,2/7,4/7)
+
+#Log da probabilidade alvo
+parametros <- list(logpi = log(DistribuiçãoAlvo))
+log_densidade <- function(x, parametros){
+  return(parametros$logpi[x])
+}
+
+proposal_param_A <- list(matriz_transicao = MatrizTransiçãoA, card = 3)
+
+#Função para gerar as propostas
+rproposal <- function(states, parametro_proposto){
+  for(index in 1:length(states)){
+    states[index] <- sample(x = 1:parametro_proposto$card, size = 1,
+                            prob = parametro_proposto$matriz_transicao[states[index], ])
+  }
+  return(list(states = states))
+}
+
+# Algoritmo - PAWL
+dproposal <- function(states, ys, parametro_proposto){#Função para calcular a densidade do núcleo proposto
+  for (index in 1:(length(states))){
+    states[index] <- log(parametro_proposto$matriz_transicao[states[index], ys[index]])
+  }
+  return(states)
+}
+
+proposal_instance_A <- proposal(rproposal = rproposal,
+                                dproposal = dproposal,
+                                proposalparam = proposal_param_A)
+
+
+#Função para criar os pontos de partidos do algoritmo MCMC
+rinit <- function(size) return(rep(1, size))
+
+#Definindo o alvo
+discretetarget <- target(name = "discrete toy example", dimension = 1, type = "discrete",
+                         rinit = rinit, logdensity = log_densidade, parameters = parametros)
+
+#Especificando os tuning paramethers do M-H
+mhparameters <- tuningparameters(nchains = 1, niterations = 10000, storeall = TRUE)
+
+getPos <- function(points, logdensity) 2 - (points <= 2)
+positionbinning <- binning(position = getPos,
+                           name = "position",
+                           bins = c(1, 2),
+                           desiredfreq = c(0.8, 0.2),
+                           useLearningRate = FALSE)
+pawlresults_A <- pawl(discretetarget, binning = positionbinning,
+                      AP = mhparameters, proposal_instance_A)
+pawlchains_A <- ConvertResults(pawlresults_A)
+plot(pawlchains_A, main="Resultados")
+
+```
+
+### Referências
+
+<p>F. Liang, C. Liu, and R. Carroll, (2011). Advanced markov chain monte carlo methods: Learning from past samples. \textit{Wiley Series in Computational Statistics, Wiley}.</p>
+
+<p>Christian Robert, George Casella (auth.) (2010). Introducing Monte Carlo Methods with R. \textit {1a ed. Use R, Springer-Verlag}.</p>
+
+
+<p>Brooks S., et al. (eds.) (2011). Handbook of Markov Chain Monte Carlo. \textit {Chapman & Hall/CRC handbooks of modern statistical methods, Taylor & Francis}.</p>
+
+
+
+
