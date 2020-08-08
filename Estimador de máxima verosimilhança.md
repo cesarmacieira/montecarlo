@@ -1,6 +1,4 @@
-<p>
 O estimador de máxima verosimilhança aproximado por Monte Carlo MCEMV
-</p>
 <p>
 Gerando dados a partir de:
 </p>
