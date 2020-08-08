@@ -14,16 +14,16 @@ Monte Carlo MC
     for(i in 1:1000){
       amostra_sim <- rexp(100,rate = priori[i])
       if(abs(1/mean(amostra) - 1/mean(amostra_sim)) < erro){
-        resultados[i] <- "O valor foi aceito"
+        resultados[i] <- "Valor(es) aceito(s)"
       }else{
-        resultados[i] <- "O valor não foi aceito"
+        resultados[i] <- "Valor(es) não aceito(s)"
       }
     }
     table(resultados)
 
     ## resultados
-    ##     O valor foi aceito O valor não foi aceito 
-    ##                     12                    988
+    ##     Valor(es) aceito(s) Valor(es) não aceito(s) 
+    ##                       6                     994
 
 Movimento Browniano
 -------------------
@@ -43,16 +43,16 @@ Movimento Browniano
     for(i in 1:1000){
       amostra_sim <- rexp(100,rate = priori[i])
       if(abs(1/mean(amostra) - 1/mean(amostra_sim)) < erro){
-        resultados[i] <- "O valor foi aceito"
+        resultados[i] <- "Valor(es) aceito(s)"
       }else{
-        resultados[i] <- "O valor não foi aceito"
+        resultados[i] <- "Valor(es) não aceito(s)"
       }
     }
     table(resultados)
 
     ## resultados
-    ##     O valor foi aceito O valor não foi aceito 
-    ##                     10                    990
+    ##     Valor(es) aceito(s) Valor(es) não aceito(s) 
+    ##                       7                     993
 
 Metropolis-Hastings
 -------------------
@@ -84,16 +84,16 @@ Metropolis-Hastings
     for(i in 1:1000){
       amostra_sim <- rexp(100,rate = priori[i])
       if(abs(1/mean(amostra) - 1/mean(amostra_sim)) < erro){
-        resultados[i] <- "O valor foi aceito"
+        resultados[i] <- "Valor(es) aceito(s)"
       }else{
-        resultados[i] <- "O valor não foi aceito"
+        resultados[i] <- "Valor(es) não aceito(s)"
       }
     }
     table(resultados)
 
     ## resultados
-    ##     O valor foi aceito O valor não foi aceito 
-    ##                      5                    995
+    ##     Valor(es) aceito(s) Valor(es) não aceito(s) 
+    ##                       7                     993
 
 Gibbs Sampler
 -------------
@@ -113,13 +113,13 @@ Gibbs Sampler
     for(i in 1:1000){
       amostra_sim <- rexp(100,rate = priori[i])
       if(abs(1/mean(amostra) - 1/mean(amostra_sim)) < erro){
-        resultados[i] <- "O valor foi aceito"
+        resultados[i] <- "Valor(es) aceito(s)"
       }else{
-        resultados[i] <- "O valor não foi aceito"
+        resultados[i] <- "Valor(es) não aceito(s)"
       }
     }
     table(resultados)
 
     ## resultados
-    ##     O valor foi aceito O valor não foi aceito 
-    ##                     15                    985
+    ##     Valor(es) aceito(s) Valor(es) não aceito(s) 
+    ##                       8                     992
