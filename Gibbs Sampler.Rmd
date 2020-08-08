@@ -2,7 +2,6 @@
 title: "Two-state Gibbs Sampler"
 subtitle: "(Amostrador de Gibbs dois estágios)"
 author: "César Macieira"
-date: "17 de setembro de 2019"
 output: html_document
 ---
 
