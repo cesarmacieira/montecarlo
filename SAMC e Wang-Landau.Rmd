@@ -1,7 +1,6 @@
 ---
 title: "Stochastic Approximation Monte Carlo e Wang-Landau"
 author: "César Macieira"
-date: "27/11/2019"
 output: html_document
 ---
 
