@@ -2,7 +2,6 @@
 title: "Slice Sampler, Hit-and-run e Random Walk Metropolis"
 subtitle: "(Amostrador por partes)"
 author: "César Macieira"
-date: "12 de novembro de 2019"
 output: html_document
 ---
 ```{r,include=F,message=FALSE,warning=FALSE}
