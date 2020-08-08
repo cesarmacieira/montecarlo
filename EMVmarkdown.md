@@ -1,8 +1,8 @@
+Estimador de máxima verossimilhança
+--------------
+
 <p>
-O estimador de máxima verosimilhança aproximado por Monte Carlo MCEMV
-</p>
-<p>
-Gerando dados a partir de:
+Gerando dados a partir dos métodos:
 </p>
 
 Monte Carlo MC
