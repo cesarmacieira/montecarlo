@@ -12,7 +12,6 @@ Monte Carlo MC
 Utilizando a função vista em sala de aula para otimizar a
 Log-verossimilhança
 </p>
-
     xamostra <- rexp(100, 1)  # amostra inicial de tamanho 100
     thetaestimado <- seq(0, 2, length.out = 100)  # possíveis valores para theta 
     verossimilhanca <- c()# vetor para armazenar a verossimilhança de cada theta estimado
@@ -24,16 +23,12 @@ Log-verossimilhança
     thetaestimado[which.max(verossimilhanca)] #valor máximo da verossimilhança
 
     ## [1] 0.9494949
-
 <p>
 Utilizando a função optim para otimizar a Log-verossimilhança
 </p>
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-3-1.png)
-
 Movimento Browniano
 -------------------
-
     Mi = -1 # Valor para Mi
     X = rep(0,1000) # Armazena a cadeia
     X[1] = 0 # X inicial
@@ -42,23 +37,18 @@ Movimento Browniano
     }
     hist(X, main = "Histograma de Xt",ylab = "Frequência",ylim = c(0,400)) # Histograma da Cadeia
     abline(v=1,col="red")
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-4-1.png)
-
     X = data.frame(X = X[501:1000]) #Escolhendo as 500 observações
     ggplot(data = X, mapping = aes(sample = X)) +
       stat_qq_band(distribution = "exp", dparams = list(rate = 1)) +
       stat_qq_line(distribution = "exp", dparams = list(rate = 1)) +
       stat_qq_point(distribution = "exp", dparams = list(rate = 1)) +
       labs(x = "Quantis definidos", y = "Quantis amostrados")
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-4-2.png)
-
 <p>
 Utilizando a função vista em sala de aula para otimizar a
 Log-verossimilhança
 </p>
-
     xamostra <- X 
     thetaestimado <- seq(0, 2, length.out = 100)  # possíveis valores para theta 
     verossimilhanca <- c()# vetor para armazenar a verossimilhança de cada theta estimado
@@ -79,7 +69,6 @@ Utilizando a função optim para otimizar a Log-verossimilhança
 
 Metropolis-Hastings (Seguindo referência)
 -----------------------------------------
-
     target = function(x){
       if(x<0){
         return(0)}
@@ -105,14 +94,11 @@ Metropolis-Hastings (Seguindo referência)
       stat_qq_line(distribution = "exp", dparams = list(rate = 1)) +
       stat_qq_point(distribution = "exp", dparams = list(rate = 1)) +
       labs(x = "Quantis definidos", y = "Quantis amostrados")
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-7-1.png)
-
 <p>
 Utilizando a função vista em sala de aula para otimizar a
 Log-verossimilhança
 </p>
-
     xamostra <- X 
     thetaestimado <- seq(0, 2, length.out = 100)  # possíveis valores para theta 
     verossimilhanca <- c()# vetor para armazenar a verossimilhança de cada theta estimado
@@ -124,13 +110,10 @@ Log-verossimilhança
     thetaestimado[which.max(verossimilhanca)] #valor máximo da verossimilhança
 
     ## [1] 1.070707
-
 <p>
 Utilizando a função optim para otimizar a Log-verossimilhança
 </p>
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-9-1.png)
-
 Gibbs Sampler
 -------------
 
@@ -142,9 +125,7 @@ Gibbs Sampler
     }
     hist(X, main = "Histograma de Xt",ylab = "Frequência",ylim = c(0,400)) # Histograma da Cadeia
     abline(v=1,col="red")
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-10-1.png)
-
     X = data.frame(X=X)
     ggplot(data = X, mapping = aes(sample = X)) +
       stat_qq_band(distribution = "exp", dparams = list(rate = 1)) +
@@ -157,7 +138,6 @@ Gibbs Sampler
 Utilizando a função vista em sala de aula para otimizar a
 Log-verossimilhança
 </p>
-
     xamostra <- X 
     thetaestimado <- seq(0, 2, length.out = 100)  # possíveis valores para theta 
     verossimilhanca <- c()# vetor para armazenar a verossimilhança de cada theta estimado
@@ -169,9 +149,7 @@ Log-verossimilhança
     thetaestimado[which.max(verossimilhanca)] #valor máximo da verossimilhança
 
     ## [1] 0.8888889
-
 <p>
 Utilizando a função optim para otimizar a Log-verossimilhança
 </p>
-
 ![](EMVmarkdown_files/figure-markdown_strict/unnamed-chunk-12-1.png)
