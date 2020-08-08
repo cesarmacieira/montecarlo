@@ -1,0 +1,248 @@
+---
+title: "Lista 1"
+author: "César Macieira"
+date: "26 de agosto de 2019"
+output: html_document
+---
+```{r,include=F}
+require(dplyr)
+```
+#Exercício 1
+<p>$X \sim U[0,\theta]$, $h_\theta=1$, $c(\theta)=\theta$, supondo $c(1)=1$, então $\psi=1$.</p>
+```{r}
+n<-100 #Número de simulações
+amostra<-runif(n,0,1)#Gerando 100 valores com distribuição U[0,1]
+funcaolog<-function(theta){#Função que calcula o log da soma se o valor amostral for menor que theta
+  return(log(sum(amostra<theta)))
+}
+theta<-seq(0,1,0.001)#Criando valores entre 0 e 1
+aux<-NULL
+for(i in 1:length(theta)){
+  aux[i]<-funcaolog(theta[i])
+}
+thetaest<-theta[which.max(aux)]#Retorna o máximo valor de theta
+thetaest
+```
+# Exercício 2
+<p> $\theta=\frac{1}{2}$, $n=10$, $\pi \sim U[0,1]$</p>
+* Simular $m=100$, $\theta\sim U[0,1]=\pi$.
+* Simular $n=10$, $\tilde{x} \sim U[0,\theta]$ $\forall \theta_1,\theta_2,...,\theta_{100}$.
+* Usando o critério de distância entre o máximo dos vetores, verifique se os valores são aceitos.
+```{r}
+thetareal <- runif(10,min=0,max=0.5)#Theta = 0.5
+thetasimulado <- runif(100,min=0,max=1)#Simulações com theta ~ U[0,1]
+auxiliar <- matrix(data=NA,nrow=100,ncol=10)
+for(i in 1:100){
+  amostra <- runif(10,min=0,max=thetasimulado[i])#Gera amostra de tamanho 10 para cada theta simulado
+  for(j in 1:10){
+    auxiliar[i,j] <- amostra[j]#Armazena a amostra de tamanho 10 na linha correspondente
+  }
+}
+cat("O valor máximo real foi:",max(thetareal))
+for(i in 1:10){#Verifica se o valor foi aceito ou não
+  if(abs(max(auxiliar[,i])-max(thetareal))<0.001){
+    cat("O valor",max(auxiliar[,i]),"foi aceito\n")    
+  }else{
+    cat("O valor",max(auxiliar[,i]),"não foi aceito\n")
+  }
+}
+
+
+```
+# Exercício 3
+<p>Implementar MCMCMLE e ABC para exponencial (2) como nos slides.</p>
+###ABC
+```{r}
+thetareal <- rexp(10, rate=2)#Theta = 2
+thetasimulado <- rexp(100, rate=1)#Simulações com theta ~ Exp(1)
+auxiliar <- matrix(data=NA,nrow=100,ncol=10)
+for(i in 1:100){
+  amostra <- rexp(10,thetasimulado[i])#Gera amostra de tamanho 10 para cada theta simulado
+  for(j in 1:10){
+    auxiliar[i,j] <- amostra[j]#Armazena a amostra de tamanho 10 na linha correspondente
+  }
+}
+```
+##### Parte 1
+<p>Use como distância o módulo.</p>
+```{r}
+for(i in 1:10){
+  if(abs(mean(auxiliar[,i])-mean(thetareal))<0.01){
+    cat("O valor",mean(auxiliar[,i]),"foi aceito\n")    
+  }else{
+    cat("O valor",mean(auxiliar[,i]),"não foi aceito\n")
+  }
+}
+```
+##### Parte 2
+<p>Use como distância o módulo e o recíproco das médias.</p>
+```{r}
+for(i in 1:10){
+  if(abs(1/(mean(auxiliar[,i]))-1/(mean(thetareal)))<0.01){
+    cat("O valor",1/mean(auxiliar[,i]),"foi aceito\n")    
+  }else{
+    cat("O valor",1/mean(auxiliar[,i]),"não foi aceito\n")
+  }
+}
+```
+###MCMCLE
+```{r}
+require(stats4)
+set.seed(1000)
+m<-100
+n<-10
+xm<-rexp(m,2)
+xn<-rexp(n,1)
+calula<-function(theta,xm,xn,m,n)
+  return(-(sum(xn)*(1-theta)-n*log(sum(exp(xm*(1-theta)))/m)))
+max<-optim(1,calula,xm=xm,xn=xn,m=m,n=n,lower=0,upper=Inf,method="L-BFGS-B")
+thetaest<-max$par
+thetaest
+distpriori = function(x){
+  aux <- case_when(x<0~0,
+                   x>=0~exp(-x))
+  return(aux)
+}
+```
+<p>Outra forma de estimar theta</p>
+```{r}
+x = rep(0,100);x[1] = 1    
+for(i in 2:100){
+  xatual = x[i-1]
+  xestimado = xatual + rnorm(1,mean=0,sd=1)
+  A = distpriori(xestimado)/distpriori(xatual) 
+  if(runif(1)<A){
+    x[i] = xestimado       
+  } else {
+    x[i] = xatual        
+  }
+}
+x[100]
+```
+
+#Exercício 4
+<p>Considere $X \sim exp(2)$</p>
+* Ache $E(X^2)$ usando a aproximação de Monte Carlo com m=10, 100. Encontre a varância do estimador.
+
+<p>Calculando o valor exato de $E(X^2)$ que é dado pela fórmula:</p>
+$$
+\begin{align}
+\int_{0}^{\infty}2x^2e^{-2x}dx
+\end{align}
+$$
+
+```{r}
+lambda=2
+hx<-function(x){ (x^2)*lambda*exp(-lambda*x) } 
+integrate(hx, lower=0, upper=Inf)
+```
+<p>Definindo densidade da distribuição exponencial:</p>
+```{r}
+f.x <- function(lambda=2,x=X){
+  beta <- 1/lambda
+  return((1/beta)*exp(-x/beta))
+}
+```
+<p>A função de distribuição é dada por:</p>
+```{r}
+F.x <- function(lambda=2,x){
+  return(1-exp(-lambda*x))
+}
+```
+<p>A função inversa da distribuição é dada por:</p>
+```{r}
+F.inv <- function(lambda,p){
+  return(-log(1-p)/lambda)
+}
+```
+<p>Se F(x)=U, então temos que o valor de x é associado a distribuição uniforme:</p>
+```{r}
+get.x <- function(lambda=2,U){
+  mu <- 1/lambda
+  x <- -mu*(log(U))
+}
+```
+<p>$E(X^2)$</p>
+```{r}
+sigma.est <- function(x){
+  return(x^2*f.x(x=x))
+}
+```
+
+<p>Para m=10</p>
+```{r}
+m=10
+i <- 0
+sigma <- c()
+
+while(i<m){
+  U <- runif(m)#Gerando m observações com distribuição U[0,1]
+  x <- get.x(U=U)#Obtendo X como uma função da inversa de U
+  sigma <- c(sigma,mean(sigma.est(x=x)))#Calculando o valor de sigma^2 e armazenando no vetor
+  i <- i+1
+}
+x <- seq(0,1,length.out = 1000)
+mu <- x*f.x(x=x)#Calculando a esperança
+mean(mu)
+sigma <- (x-mu)^2
+mean(sigma)
+```
+<p>Para m=100</p>
+```{r}
+m=100
+i <- 0
+sigma <- c()
+
+while(i<m){
+  U <- runif(m)#Gerando m observações com distribuição U[0,1]
+  x <- get.x(U=U)#Obtendo X como uma função da inversa de U
+  sigma <- c(sigma,mean(sigma.est(x=x)))#Calculando o valor de sigma^2 e armazenando no vetor
+  i <- i+1
+}
+x <- seq(0,1,length.out = 1000)
+mu <- x*f.x(x=x)#Calculando a esperança
+mean(mu)
+sigma <- (x-mu)^2
+mean(sigma)
+```
+
+* Ache $E(X^2)$ usando a aproximação de Monte Carlo e amostragem por importância com $g(x)=exp^{-x}, x>0$ a densidade da exponencial m=10,100. Encontre a variância do estimador.
+```{r}
+set.seed(0)
+x <- rexp(10,2) #Para m = 10
+f <- function(x) 2 * (x^2) *exp(-x^2) 
+w <- f(x) / dexp(x)  
+mean(x)
+mean(w * x)
+mean(w * x) / mean(w)
+
+x <- rexp(100,2) #Para m = 100
+f <- function(x) 2 * (x^2) *exp(-x^2) 
+w <- f(x) / dexp(x)  
+mean(x)
+mean(w * x)
+mean(w * x) / mean(w)
+
+#m=10
+c(mean(rexp(10,2)^2),sd(rexp(10,2)^2))
+#m=100
+c(mean(rexp(100,2)^2),sd(rexp(100,2)^2))
+
+#m=10
+x10<-rexp(10,1)
+c(mean((dexp(x10,2)/dexp(x10,1))*x10^2),sd((dexp(x10,2)/dexp(x10,1))*x10^2))
+#m=100
+x100<-rexp(100,1)
+c(mean((dexp(x100,2)/dexp(x100,1))*x100^2),sd((dexp(x100,2)/dexp(x100,1))*x100^2))
+```
+
+
+
+
+
+
+
+
+
+
+
